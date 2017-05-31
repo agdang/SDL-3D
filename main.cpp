@@ -1,32 +1,35 @@
-#include <SDL.h>
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_image.h>
 
 #include <ctime>
 #include <stdlib.h>
 #include <stdio.h>
 
-struct Vector
-{
-	float x;
-	float y;
-	float z;
+#include <vector>
 
-	Vector(float x, float y, float z)
+SDL_Texture* LoadBMP(SDL_Renderer* renderer, const char* file)
+{
+	SDL_Texture* tex = nullptr;
+	SDL_Surface* surf = IMG_Load(file);
+	if (surf != nullptr)
 	{
-		this->x = x;
-		this->y = y;
-		this->z = z;
+		tex = SDL_CreateTextureFromSurface(renderer, surf);
+		SDL_FreeSurface(surf);
 	}
-};
+
+	return tex;
+}
 
 int main(int argc, char* argv[])
 {
 	srand(time(NULL));
 
-	static const int WINDOW_WIDTH = 640;
-	static const int WINDOW_HEIGHT = 480;
-	static const int CAMERA_HEIGHT = 50;
+	static const int WINDOW_WIDTH = 1024;
+	static const int WINDOW_HEIGHT = 768;
+	static const int CAMERA_HEIGHT = 25;
 
 	SDL_Init(SDL_INIT_VIDEO);
+	IMG_Init(IMG_INIT_PNG);
 
 	SDL_Window* window = SDL_CreateWindow("3D Engine", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WINDOW_WIDTH, WINDOW_HEIGHT, 0);
 	SDL_Renderer* renderer = SDL_CreateRenderer(window, 0, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
@@ -37,30 +40,41 @@ int main(int argc, char* argv[])
 
 	float lookX = 0;
 	float lookY = CAMERA_HEIGHT;
-	float lookZ = -100;
-	float lookDepth = .3;
-	float lookAngle = 0;
+	float lookZ = -1000;
+	float lookDepth = .84;
+	//float lookAngleX = 0;
+	float lookAngleY = 0;
 
 	int input[6] = { 0, 0, 0, 0, 0 };
 
 	float gravity = .06f;
-	float yvel;
+	float yvel = 0;
 
 	bool jumping = false;
 
 	SDL_Rect sky = { 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT };
 	SDL_Rect grass = { 0, WINDOW_HEIGHT / 2, WINDOW_WIDTH, WINDOW_HEIGHT };
 
-	int px[10000];
-	int height[10000];
-	int pz[10000];
+	int px[1000];
+	int height[1000];
+	int pz[1000];
 
-	for (int i = 0; i < 10000; i++)
+	for (int i = 0; i < 1000; i++)
 	{
-		px[i] = -200 + rand() % 400 + 1;
-		pz[i] = rand() % 100 + 1;
-		height[i] = rand() % 5 + 1;
+		px[i] = (-50 + rand() % 100 + 10)*20;
+		pz[i] = (i/10)*20;
+		height[i] = rand() % 3 + 2;
 	}
+
+	std::vector<SDL_Texture*>trees;
+	SDL_Rect treepos[20];
+
+	for (int i = 0; i < 20; i++)
+	{
+		trees.push_back(LoadBMP(renderer, "tree.png"));
+	}
+
+	SDL_Texture* tree = LoadBMP(renderer, "tree.png");
 
 	while (running)
 	{
@@ -91,15 +105,16 @@ int main(int argc, char* argv[])
 					break;
 				case SDLK_q:
 					input[4] = 1;
-					//lookAngle -= 1;
 					break;
 				case SDLK_e:
 					input[5] = 1;
-					//lookAngle += 1;
 					break;
 				case SDLK_SPACE:
-					yvel = 1.8;
-					jumping = true;
+					if (!jumping)
+					{
+						yvel = 1.8;
+						jumping = true;
+					}
 					break;
 				}
 				break;
@@ -121,23 +136,23 @@ int main(int argc, char* argv[])
 					break;
 				case SDLK_q:
 					input[4] = 0;
-					//lookAngle -= 1;
+					//lookAngleX -= 1;
 					break;
 				case SDLK_e:
 					input[5] = 0;
-					//lookAngle += 1;
+					//lookAngleX += 1;
 					break;
 				}
 				break;
 			}
 		}
 
-		if (input[0] == 1) lookZ += .5;
-		if (input[1] == 1) lookZ -= .5;
-		if (input[2] == 1) lookX -= 2.0;
-		if (input[3] == 1) lookX += 2.0;
-		if (input[4] == 1) lookAngle -= 1;
-		if (input[5] == 1) lookAngle += 1;
+		if (input[0] == 1) lookZ += 1;
+		if (input[1] == 1) lookZ -= 1;
+		if (input[2] == 1) lookX -= 1;
+		if (input[3] == 1) lookX += 1;
+		if (input[4] == 1) lookAngleY -= 1;
+		if (input[5] == 1) lookAngleY += 1;
 
 		if (jumping == true)
 		{
@@ -162,14 +177,15 @@ int main(int argc, char* argv[])
 		SDL_RenderFillRect(renderer, &sky);
 
 		grass.y = (1 - scale * (0 - lookY)) * WINDOW_HEIGHT / 2;
+		grass.h = WINDOW_HEIGHT*4;
 
 		SDL_SetRenderDrawColor(renderer, 40, 150, 40, 255);
 		SDL_RenderFillRect(renderer, &grass);
 
-		for (int i = 0; i < 10000; i++)
+		for (int i = 0; i < 1000; i++)
 		{
 			float scale = lookDepth / (-pz[i] - lookZ);
-			float x = (1 + scale * (-px[i] - lookX)) * WINDOW_WIDTH / 2;
+			float x = (1 + scale * (-px[i] - lookX)) *	 WINDOW_WIDTH / 2;
 			float y = (1 - scale * (0 - lookY)) * WINDOW_HEIGHT / 2;
 
 			SDL_SetRenderDrawColor(renderer, 100, 255, 100,  100);
@@ -179,10 +195,27 @@ int main(int argc, char* argv[])
 				SDL_RenderDrawLine(renderer, x, y, x, y - (height[i]));
 			}
 		}
+
+		for (int i = 0; i < 20; i++)
+		{
+			scale = lookDepth / (-pz[i*50] - lookZ);
+			float x = (1 + scale * (-px[i*50] - lookX)) * WINDOW_WIDTH / 2;
+			float y = (1 - scale * (0 - lookY)) * WINDOW_HEIGHT / 2;
+
+			treepos[i].x = x;
+			treepos[i].y = y;
+			treepos[i].w = 50000 * scale; treepos[i].h = 50000 * scale;
+			treepos[i].y -= treepos[i].h;
+			SDL_RenderCopy(renderer, trees[i], NULL, &treepos[i]);
+		}
+
 		SDL_RenderPresent(renderer);
 	}
 
+	for (auto it : trees)
+		SDL_DestroyTexture(it);
 
+	SDL_DestroyTexture(tree);
 	SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(window);
 
